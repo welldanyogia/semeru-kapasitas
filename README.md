@@ -17,8 +17,8 @@ Mendukung loop/polling, backoff otomatis saat error, dan highlight status **TERS
 ## Instalasi (Lokal / VPS)
 ```bash
 # 1) clone
-git clone https://github.com/<user>/<repo>.git
-cd <repo>
+git clone https://github.com/welldanyogia/semeru-kapasitas.git
+cd semeru-kapasitas
 
 # 2) (opsional) gunakan virtualenv
 python3 -m venv .venv
