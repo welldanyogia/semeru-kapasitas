@@ -42,3 +42,15 @@ source .venv/bin/activate
 # 3) dependencies
 python -m pip install --upgrade pip wheel
 pip install requests beautifulsoup4 colorama
+```
+
+## Penggunaan
+```bash
+python semeru-kapasitas.py \
+  --site-id 8 \
+  --year-month 2025-10 \
+  --target 2025-10-18 \
+  --loop \
+  --interval 1 \
+  --ipv4
+```
