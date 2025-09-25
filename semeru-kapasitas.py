@@ -146,6 +146,11 @@ def parse_kapasitas_rows(html: str) -> List[Dict[str, Any]]:
     Parse tabel kapasitas menjadi list dict:
     {tanggalText, tanggalISO, statusText, sisa, isFull, available}
     """
+    import re
+
+    def _is_int_str(v: Optional[str]) -> bool:
+        return bool(v) and bool(re.fullmatch(r"-?\d+", v.strip()))
+
     soup = BeautifulSoup(html, "html.parser")
     rows = []
     for tr in soup.select("tbody tr"):
@@ -162,25 +167,21 @@ def parse_kapasitas_rows(html: str) -> List[Dict[str, Any]]:
         hide_el = tds[1].select_one(".hide")
         hide_val_raw = hide_el.get_text(strip=True) if hide_el else None
 
-        # parse sisa jika .hide berisi angka, jika tidak biarkan None
-        sisa: Optional[int]
-        if hide_val_raw and hide_val_raw.isdigit():
-            sisa = int(hide_val_raw)
+        # ======= PERUBAHAN: dukung angka negatif =======
+        if _is_int_str(hide_val_raw):
+            sisa: Optional[int] = int(hide_val_raw)   # termasuk nilai minus
         else:
             sisa = None
 
         tanggal_iso = to_iso_from_tanggal_id(tanggal_text)
         st_low = status_text.lower()
 
-        # indikasi penuh dari teks
         is_full_text = ("penuh" in st_low) or ("kuota penuh" in st_low)
 
-        # jika .hide tidak menampilkan angka (disembunyikan) dan teks "Kuota Penuh",
-        # paksa dianggap penuh meskipun sisa=None
-        hide_is_hidden = hide_el is not None and (not hide_val_raw or not hide_val_raw.isdigit())
-        full_by_hidden = ("kuota penuh" in st_low) and hide_is_hidden
+        # ======= PERUBAHAN: pakai _is_int_str untuk deteksi "disembunyikan" =======
+        hide_is_hidden = hide_el is not None and not _is_int_str(hide_val_raw)
 
-        # juga anggap penuh bila sisa==0 (kalau kebetulan ada angkanya)
+        full_by_hidden = ("kuota penuh" in st_low) and hide_is_hidden
         is_full_zero = (isinstance(sisa, int) and sisa == 0)
 
         is_full = bool(is_full_text or full_by_hidden or is_full_zero)
@@ -222,9 +223,10 @@ def _match_target(row: Dict[str, Any], target: Union[int, str]) -> bool:
 def _human_summary(row: Dict[str, Any]) -> str:
     """Ringkasan ramah-awam, multi-baris (berwarna)."""
     sisa = row.get("sisa")
+
+    # Jika sisa adalah int (termasuk minus), tampilkan angkanya.
     sisa_txt = f"{sisa} kuota" if isinstance(sisa, int) else "tidak diketahui"
 
-    # Warna ketersediaan
     available = bool(row.get("available"))
     is_full = bool(row.get("isFull"))
 
@@ -235,11 +237,15 @@ def _human_summary(row: Dict[str, Any]) -> str:
     else:
         avail_txt = C("BELUM TERSEDIA ❌", Fore.YELLOW, bright=True)
 
-    # Warna 'sisa'
+    # Pewarnaan sisa:
+    # >0 : hijau, ==0 : merah, <0 : merah (minus dianggap kondisi buruk),
+    # None : kuning (tidak diketahui)
     if isinstance(sisa, int) and sisa > 0:
         sisa_colored = C(sisa_txt, Fore.GREEN, bright=True)
     elif isinstance(sisa, int) and sisa == 0:
         sisa_colored = C(sisa_txt, Fore.RED, bright=True)
+    elif isinstance(sisa, int) and sisa < 0:
+        sisa_colored = C(sisa_txt, Fore.RED, bright=True)  # << tampilkan minus, bukan "tidak diketahui"
     else:
         sisa_colored = C(sisa_txt, Fore.YELLOW)
 
